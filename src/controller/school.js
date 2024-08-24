@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const Redis = require('ioredis');
 
 const prisma = new PrismaClient();
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_URL );
 
 // Define SchoolSchema for req.body
 const SchoolSchema = z.object({
@@ -67,10 +67,12 @@ const getSchools = async (req, res) => {
 
     // Try to get schools from Redis cache
     let schools = await redis.get('schools');
+    console.log('from redis ')
 
     if (!schools) {
       // If not in cache, fetch from database
       schools = await prisma.school.findMany();
+      console.log('form db')
       // Store in Redis for 1 hour (3600 seconds)
       await redis.set('schools', JSON.stringify(schools), 'EX', 3600);
     } else {
