@@ -12,6 +12,7 @@
   "dependencies": {
     "@prisma/client": "^5.18.0",
     "express": "^4.19.2",
+    "ioredis": "^5.4.1",
     "prisma": "^5.18.0",
     "zod": "^3.23.8"
   },

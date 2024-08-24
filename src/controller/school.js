@@ -1,6 +1,9 @@
 const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
+const Redis = require('ioredis');
+
 const prisma = new PrismaClient();
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 // Define SchoolSchema for req.body
 const SchoolSchema = z.object({
@@ -25,6 +28,9 @@ const createSchool = async (req, res) => {
     const newSchool = await prisma.school.create({
       data: validatedData
     });
+
+    // Invalidate the schools cache
+    await redis.del('schools');
 
     return res.status(200).json({
       data: newSchool,
@@ -59,7 +65,17 @@ const getSchools = async (req, res) => {
     // Validate the query parameters
     const { userLat, userLon } = LocationSchema.parse(req.query);
 
-    const schools = await prisma.school.findMany();
+    // Try to get schools from Redis cache
+    let schools = await redis.get('schools');
+
+    if (!schools) {
+      // If not in cache, fetch from database
+      schools = await prisma.school.findMany();
+      // Store in Redis for 1 hour (3600 seconds)
+      await redis.set('schools', JSON.stringify(schools), 'EX', 3600);
+    } else {
+      schools = JSON.parse(schools);
+    }
 
     // Calculate distance and sort
     const sortedSchools = schools.map(school => ({
@@ -73,7 +89,6 @@ const getSchools = async (req, res) => {
       error: false,
       message: "Schools fetched successfully"
     });
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
